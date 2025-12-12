@@ -1,10 +1,8 @@
-const jsonResponse = (body, status = 200) => new Response(JSON.stringify(body), {
-  status,
-  headers: {
-    'Content-Type': 'application/json; charset=utf-8',
-    'Access-Control-Allow-Origin': '*',
-  },
-});
+import { writeFile } from 'fs/promises';
+
+const TARGET = 'https://www.customstrack.com/503535184203';
+const HTML_OUTPUT = 'sample-503535184203.html';
+const JSON_OUTPUT = 'sample-503535184203.json';
 
 const sliceBetween = (text, start, end) => {
   const startIdx = text.indexOf(start);
@@ -139,57 +137,22 @@ const parseAllEvents = (html) => {
   return events;
 };
 
-export default {
-  async fetch(request) {
-    if (request.method === 'OPTIONS') {
-      return new Response(null, {
-        status: 204,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-      });
-    }
+const transformToPayload = (html) => {
+  const customsSection = sliceBetween(html, '통관 진행', '배송 진행');
+  const deliverySection = sliceBetween(html, '배송 진행', '연락처');
+  const contactSection = sliceBetween(html, '연락처', '</body>');
 
-    const url = new URL(request.url);
-    const pathInvoice = url.pathname.replace(/^\/+/, '');
-    const invoice = url.searchParams.get('invoice') || pathInvoice;
+  const companyName = extractLabelValue(contactSection, '통관업체') || extractLabelValue(html, '통관업체') || '';
+  const companyPhone = extractLabelValue(contactSection, '대표번호') || extractLabelValue(html, '대표번호') || '';
+  const deliveryCarrier = extractLabelValue(contactSection, '택배사') || extractLabelValue(html, '배송사') || '';
+  const deliveryPhone = extractLabelValue(contactSection, '대표번호', true) || extractLabelValue(html, '대표번호', true) || '';
 
-    if (!invoice) {
-      return jsonResponse({ error: 'invoice가 필요합니다.' }, 400);
-    }
-
-    const target = `https://www.customstrack.com/${encodeURIComponent(invoice)}`;
-
-    let html;
-    try {
-      const res = await fetch(target, {
-        headers: { 'User-Agent': 'Mozilla/5.0 customstrack-proxy' },
-      });
-      if (!res.ok) {
-        return jsonResponse({ error: '원본 데이터를 불러오지 못했습니다.' }, res.status);
-      }
-      html = await res.text();
-    } catch (err) {
-      return jsonResponse({ error: '데이터 요청 중 오류가 발생했습니다.' }, 502);
-    }
-
-    const customsSection = sliceBetween(html, '통관 진행', '배송 진행');
-    const deliverySection = sliceBetween(html, '배송 진행', '연락처');
-    const contactSection = sliceBetween(html, '연락처', '</body>');
-
-    const companyName = extractLabelValue(contactSection, '통관업체') || extractLabelValue(html, '통관업체') || '';
-    const companyPhone = extractLabelValue(contactSection, '대표번호') || extractLabelValue(html, '대표번호') || '';
-    const deliveryCarrier = extractLabelValue(contactSection, '택배사') || extractLabelValue(html, '배송사') || '';
-    const deliveryPhone = extractLabelValue(contactSection, '대표번호', true) || extractLabelValue(html, '대표번호', true) || '';
-
-    const arrivalDate = extractLabelValue(html, '입항일');
-    const vesselOrFlight = extractLabelValue(html, '선박/항공편');
-    const loadPort = extractLabelValue(html, '적재항');
-    const dischargePort = extractLabelValue(html, '양륙항');
-    const masterBL = extractLabelValue(html, 'Master BL');
-    const cargoNumber = extractLabelValue(html, '화물관리번호');
+  const arrivalDate = extractLabelValue(html, '입항일');
+  const vesselOrFlight = extractLabelValue(html, '선박/항공편');
+  const loadPort = extractLabelValue(html, '적재항');
+  const dischargePort = extractLabelValue(html, '양륙항');
+  const masterBL = extractLabelValue(html, 'Master BL');
+  const cargoNumber = extractLabelValue(html, '화물관리번호');
 
   let tracks = parseScriptEvents(html);
   if (!tracks.length) {
@@ -209,20 +172,41 @@ export default {
   }
   tracks = tracks.sort((a, b) => new Date(b.dateTime || 0) - new Date(a.dateTime || 0));
 
-    const payload = {
-      shipment: {
-        company: { name: companyName, phone: companyPhone || deliveryPhone },
-        arrivalDate,
-        vesselOrFlight,
-        loadPort,
-        dischargePort,
-        masterBL,
-        cargoNumber,
-        tracks,
-      },
-    };
-
-    return jsonResponse(payload);
-  },
+  return {
+    shipment: {
+      company: { name: companyName, phone: companyPhone || deliveryPhone },
+      arrivalDate,
+      vesselOrFlight,
+      loadPort,
+      dischargePort,
+      masterBL,
+      cargoNumber,
+      tracks,
+    },
+  };
 };
+
+const fetchHtml = async () => {
+  const res = await fetch(TARGET, {
+    headers: { 'User-Agent': 'Mozilla/5.0 customstrack-test' },
+  });
+  if (!res.ok) throw new Error(`fetch 실패: ${res.status} ${res.statusText}`);
+  return res.text();
+};
+
+const main = async () => {
+  const html = await fetchHtml();
+  await writeFile(HTML_OUTPUT, html, 'utf8');
+
+  const payload = transformToPayload(html);
+  await writeFile(JSON_OUTPUT, JSON.stringify(payload, null, 2), 'utf8');
+
+  console.log(`HTML 저장: ${HTML_OUTPUT}`);
+  console.log(`JSON 저장: ${JSON_OUTPUT}`);
+};
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
 
