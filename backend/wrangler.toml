@@ -1,0 +1,11 @@
+name = "customstrack-proxy"
+main = "worker.js"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+# 커스텀 도메인에 연결하려면 활성화:
+# routes = [
+#   { pattern = "example.com/api/track*", script = "customstrack-proxy" }
+# ]
+
