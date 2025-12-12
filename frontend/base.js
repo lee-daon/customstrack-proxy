@@ -5,6 +5,7 @@ const getInvoice = () => {
 
 const fetchData = async () => {
   const invoice = getInvoice();
+  if (!invoice) return null;
   const url =`https://customstrack-proxy.leedaon480.workers.dev/?invoice=${encodeURIComponent(invoice)}`
   try {
     const res = await fetch(url, { cache: 'no-cache' });
@@ -12,15 +13,7 @@ const fetchData = async () => {
     return res.json();
   } catch (err) {
     console.error(err);
-    if (invoice) return null;
-    try {
-      const fallback = await fetch('./base.json', { cache: 'no-cache' });
-      if (!fallback.ok) throw new Error('로컬 데이터 불러오기 실패');
-      return fallback.json();
-    } catch (fallbackErr) {
-      console.error(fallbackErr);
-      return null;
-    }
+    return null;
   }
 };
 
