@@ -5,9 +5,7 @@ const getInvoice = () => {
 
 const fetchData = async () => {
   const invoice = getInvoice();
-  const url = invoice
-    ? `/api/track?invoice=${encodeURIComponent(invoice)}`
-    : './base.json';
+  const url =`https://customstrack-proxy.leedaon480.workers.dev/?invoice=${encodeURIComponent(invoice)}`
   try {
     const res = await fetch(url, { cache: 'no-cache' });
     if (!res.ok) throw new Error('데이터 불러오기 실패');
