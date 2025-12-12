@@ -29,7 +29,7 @@ const normalizeDateTime = (raw) => {
 
 const parseEvents = (sectionHtml, carrier) => {
   const events = [];
-  const eventRegex = /<div class="flex gap-3">[\s\S]*?<p class="text-sm font-semibold text-gray-900">\s*([^<]+?)\s*<\/p>[\s\S]*?<span class="text-xs text-gray-500">\s*([^<]*?)\s*<\/span>[\s\S]*?<p class="text-xs text-gray-500[^>]*>\s*([^<]*?)\s*<\/p>[\s\S]*?<div class="text-xs text-gray-400[^>]*>\s*([^<]*?)\s*<\/div>/gi;
+  const eventRegex = /<div class="flex gap-3">[\s\S]*?<p class="text-sm font-semibold text-gray-900">\s*([^<]+?)\s*<\/p>[\s\S]*?<span class="text-xs text-gray-500">\s*([^<]*?)\s*<\/span>[\s\S]*?(?:<p class="text-xs text-gray-500[^>]*>\s*([^<]*?)\s*<\/p>)?[\s\S]*?(?:<div class="text-xs text-gray-400[^>]*>\s*([^<]*?)\s*<\/div>)?/gi;
   let match;
   while ((match = eventRegex.exec(sectionHtml)) !== null) {
     const [_, status, location, detail, dateTime] = match;
@@ -86,10 +86,10 @@ export default {
     const customsContact = sliceBetween(contactSection, '통관', '배송');
     const deliveryContact = sliceBetween(contactSection, '배송', '</div>');
 
-    const companyName = extractLabelValue(customsContact, '통관업체') || '';
-    const companyPhone = extractLabelValue(customsContact, '대표번호') || '';
-    const deliveryCarrier = extractLabelValue(deliveryContact, '택배사') || extractLabelValue(html, '배송사') || '';
-    const deliveryPhone = extractLabelValue(deliveryContact, '대표번호') || '';
+  const companyName = extractLabelValue(customsContact, '통관업체') || extractLabelValue(html, '통관업체') || '';
+  const companyPhone = extractLabelValue(customsContact, '대표번호') || extractLabelValue(html, '대표번호') || '';
+  const deliveryCarrier = extractLabelValue(deliveryContact, '택배사') || extractLabelValue(html, '배송사') || '';
+  const deliveryPhone = extractLabelValue(deliveryContact, '대표번호') || extractLabelValue(html, '대표번호') || '';
 
     const arrivalDate = extractLabelValue(html, '입항일');
     const vesselOrFlight = extractLabelValue(html, '선박/항공편');
@@ -98,10 +98,10 @@ export default {
     const masterBL = extractLabelValue(html, 'Master BL');
     const cargoNumber = extractLabelValue(html, '화물관리번호');
 
-    const tracks = [
-      ...parseEvents(customsSection, '관세청'),
-      ...parseEvents(deliverySection, deliveryCarrier || '배송'),
-    ].sort((a, b) => new Date(b.dateTime || 0) - new Date(a.dateTime || 0));
+  const tracks = [
+    ...parseEvents(customsSection || html, '관세청'),
+    ...parseEvents(deliverySection || html, deliveryCarrier || '배송'),
+  ].sort((a, b) => new Date(b.dateTime || 0) - new Date(a.dateTime || 0));
 
     const payload = {
       shipment: {
