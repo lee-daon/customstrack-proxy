@@ -1,0 +1,1 @@
+--purple-color: #7761FB; 가 기본값
