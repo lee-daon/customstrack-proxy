@@ -99,8 +99,11 @@ const buildTimeline = (tracks = []) => {
     acc[date].push(ev);
     return acc;
   }, {});
-  const entries = Object.entries(groups);
-  return entries.map(([date, events], idx) => `
+  const entries = Object.entries(groups).sort(([a], [b]) => new Date(b) - new Date(a));
+  return entries.map(([date, events], idx) => {
+    // 각 날짜 그룹 내 이벤트들도 시간순으로 정렬 (최신이 위로)
+    events.sort((a, b) => new Date(b.dateTime || 0) - new Date(a.dateTime || 0));
+    return `
     <div class="content-wrap" ${idx === 0 ? 'id="state_active"' : ''}>
       <div class="width-con">
         <div class="content-box">
@@ -109,7 +112,7 @@ const buildTimeline = (tracks = []) => {
         </div>
       </div>
     </div>
-  `).join('');
+  `}).join('');
 };
 
 const render = (data) => {
