@@ -6,6 +6,14 @@ const jsonResponse = (body, status = 200) => new Response(JSON.stringify(body), 
   },
 });
 
+const htmlResponse = (body, status = 200) => new Response(body, {
+  status,
+  headers: {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Access-Control-Allow-Origin': '*',
+  },
+});
+
 const sliceBetween = (text, start, end) => {
   const startIdx = text.indexOf(start);
   if (startIdx === -1) return '';
@@ -139,6 +147,294 @@ const parseAllEvents = (html) => {
   return events;
 };
 
+const formatSummary = (data) => {
+  if (!data?.shipment) return '';
+  const { company, arrivalDate, vesselOrFlight, loadPort, dischargePort, masterBL, cargoNumber } = data.shipment;
+  return `
+    <div class="width-con">
+      <div class="info cc-company">
+        <div class="info-title">통관업체</div>
+        <div>${company?.name ?? ''}</div>
+        <div><a href="tel:${company?.phone ?? ''}"></a>${company?.phone ?? ''}</div>
+      </div>
+      <div class="info">
+        <div class="info-title">입항일</div>
+        <div>${arrivalDate ?? ''}</div>
+      </div>
+      <div class="info">
+        <div class="info-title">선박/항공편명</div>
+        <div>${vesselOrFlight ?? ''}</div>
+      </div>
+      <div class="info">
+        <div class="info-title">적재항</div>
+        <div>${loadPort ?? ''}</div>
+      </div>
+      <div class="info">
+        <div class="info-title">양륙항</div>
+        <div>${dischargePort ?? ''}</div>
+      </div>
+    </div>
+    <div class="width-con">
+      <div class="info">
+        <div class="info-title">Master BL :</div>
+        <div title="복사 기능 없음">${masterBL ?? ''}</div>
+      </div>
+      <div class="info">
+        <div class="info-title">화물관리번호 :</div>
+        <div title="복사 기능 없음">${cargoNumber ?? ''}</div>
+      </div>
+    </div>
+  `;
+};
+
+const buildEvent = (event) => `
+  <div class="content">
+    <div class="dot-box">
+      <div class="dot"></div>
+    </div>
+    <div class="state-box">
+      <div class="time-text">
+        <span class="location">${event.location ?? ''}</span>
+        <span class="time-info">${(event.dateTime ?? '').split('T')[1]?.slice(0,5) ?? ''}</span>
+      </div>
+      <div class="msg-text">
+        <div>
+          <p class="msg">${event.status ?? ''}</p>
+          <p class="sub-msg">${event.detail ?? ''}</p>
+        </div>
+        <div class="company-text">
+          <span>${event.carrier ?? ''}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+`;
+
+const buildTimeline = (tracks = []) => {
+  const sorted = [...tracks].sort((a, b) => new Date(b.dateTime || 0) - new Date(a.dateTime || 0));
+  if (!sorted.length) {
+    return `
+      <div class="content-wrap no-data">
+        <div class="width-con">
+          <div class="content-no-data">
+            <div>화물이 출고된 내역이 없습니다.</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  const groups = sorted.reduce((acc, ev) => {
+    const date = (ev.dateTime ?? '').split('T')[0] ?? '';
+    if (!acc[date]) acc[date] = [];
+    acc[date].push(ev);
+    return acc;
+  }, {});
+  const entries = Object.entries(groups).sort(([a], [b]) => new Date(b) - new Date(a));
+  return entries.map(([date, events], idx) => {
+    // 각 날짜 그룹 내 이벤트들도 시간순으로 정렬 (최신이 위로)
+    events.sort((a, b) => new Date(b.dateTime || 0) - new Date(a.dateTime || 0));
+    return `
+    <div class="content-wrap" ${idx === 0 ? 'id="state_active"' : ''}>
+      <div class="width-con">
+        <div class="content-box">
+          <p class="date-text"><span>${date}</span></p>
+          ${events.map(buildEvent).join('')}
+        </div>
+      </div>
+    </div>
+  `}).join('');
+};
+
+const buildFullPage = (data) => {
+  const summaryHtml = formatSummary(data);
+  const timelineHtml = buildTimeline(data?.shipment?.tracks ?? []);
+
+  return `
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>화물 추적</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+            min-height: 100vh;
+        }
+
+        .summary {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .timeline {
+            background: white;
+        }
+
+        .width-con {
+            max-width: 100%;
+        }
+
+        .info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .info:last-child {
+            border-bottom: none;
+        }
+
+        .info-title {
+            font-weight: 600;
+            color: #666;
+            flex: 1;
+        }
+
+        .cc-company .info-title {
+            color: #007bff;
+        }
+
+        .content-wrap {
+            margin-bottom: 20px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .content-wrap.no-data {
+            text-align: center;
+            padding: 40px;
+            background: #f8f9fa;
+        }
+
+        .content-no-data {
+            color: #666;
+            font-size: 16px;
+        }
+
+        .content-box {
+            padding: 20px;
+        }
+
+        .date-text {
+            font-size: 18px;
+            font-weight: 600;
+            color: #007bff;
+            margin-bottom: 15px;
+        }
+
+        .content {
+            display: flex;
+            align-items: flex-start;
+            padding: 15px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .content:last-child {
+            border-bottom: none;
+        }
+
+        .dot-box {
+            flex-shrink: 0;
+            margin-right: 15px;
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            background: #007bff;
+            border-radius: 50%;
+            margin-top: 6px;
+        }
+
+        .state-box {
+            flex: 1;
+        }
+
+        .time-text {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .location {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .time-info {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .msg-text {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .msg {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .sub-msg {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .company-text {
+            text-align: right;
+            color: #666;
+            font-size: 14px;
+        }
+
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="summary">
+            ${summaryHtml}
+        </div>
+        <div class="timeline">
+            ${timelineHtml}
+        </div>
+    </div>
+</body>
+</html>
+  `;
+};
+
 export default {
   async fetch(request) {
     if (request.method === 'OPTIONS') {
@@ -222,7 +518,7 @@ export default {
       },
     };
 
-    return jsonResponse(payload);
+    return htmlResponse(buildFullPage(payload));
   },
 };
 
