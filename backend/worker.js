@@ -254,8 +254,10 @@ const buildFullPage = (data) => {
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>화물 추적</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=0,maximum-scale=10">
+    <meta name="format-detection" content="telephone=no">
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.6/dist/web/variable/pretendardvariable.css" />
+    <title>송장 조회</title>
     <style>
         * {
             margin: 0;
@@ -264,29 +266,28 @@ const buildFullPage = (data) => {
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: 'Pretendard Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background-color: #f5f5f5;
             color: #333;
             line-height: 1.6;
+        }
+
+        .wrap {
+            min-height: 100vh;
+            background-color: #f5f5f5;
         }
 
         .container {
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
-            background: white;
-            min-height: 100vh;
         }
 
-        .summary {
+        .content_info {
             background: #f8f9fa;
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 20px;
-        }
-
-        .timeline {
-            background: white;
         }
 
         .width-con {
@@ -422,12 +423,14 @@ const buildFullPage = (data) => {
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="summary">
-            ${summaryHtml}
-        </div>
-        <div class="timeline">
-            ${timelineHtml}
+    <div class="wrap">
+        <div class="container">
+            <div class="content_info">
+                ${summaryHtml}
+            </div>
+            <div id="timeline">
+                ${timelineHtml}
+            </div>
         </div>
     </div>
 </body>
